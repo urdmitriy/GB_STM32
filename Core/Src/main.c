@@ -107,10 +107,10 @@ int main(void)
         buttonPressedFlag = 0;
         HAL_FLASH_Unlock();
         HAL_FLASH_OB_Unlock();
-        FLASH_OBProgramInitTypeDef obConfig;
-        obConfig.RDPLevel = OB_RDP_LEVEL1;
-        obConfig.OptionType = OPTIONBYTE_RDP;
-        HAL_FLASHEx_OBProgram(&obConfig);
+        FLASH_OBProgramInitTypeDef obConfigW;
+        obConfigW.RDPLevel = OB_RDP_LEVEL1;
+        obConfigW.OptionType = OPTIONBYTE_RDP;
+        HAL_FLASHEx_OBProgram(&obConfigW);
         HAL_FLASH_OB_Lock();
         HAL_FLASH_Lock();
         HAL_FLASH_OB_Launch();
