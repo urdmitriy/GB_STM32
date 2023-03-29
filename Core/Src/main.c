@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "led_lib.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -88,32 +88,18 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-    HAL_TIM_Base_Start_IT(&htim1);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-      FLASH_OBProgramInitTypeDef obConfig;
-      HAL_FLASHEx_OBGetConfig(&obConfig);
-      if (obConfig.RDPLevel == OB_RDP_LEVEL0){
-          TIM1->ARR = 2000;
-      } else{
-          TIM1->ARR = 500;
-      }
 
     if (buttonPressedFlag){
         buttonPressedFlag = 0;
-        HAL_FLASH_Unlock();
-        HAL_FLASH_OB_Unlock();
-        FLASH_OBProgramInitTypeDef obConfigW;
-        obConfigW.RDPLevel = OB_RDP_LEVEL1;
-        obConfigW.OptionType = OPTIONBYTE_RDP;
-        HAL_FLASHEx_OBProgram(&obConfigW);
-        HAL_FLASH_OB_Lock();
-        HAL_FLASH_Lock();
-        HAL_FLASH_OB_Launch();
+        led_blink(LED_GPIO_Port, LED_Pin, htim1);
+
     }
     /* USER CODE END WHILE */
 
@@ -245,9 +231,6 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
     if (GPIO_Pin == BUTTON_Pin){
