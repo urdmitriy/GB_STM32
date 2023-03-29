@@ -43,6 +43,20 @@ TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t buttonPressedFlag = 0;
+
+struct sensor_struct{
+    int8_t temperature;
+    int8_t humidity;
+    int16_t illumination;
+};
+
+union sensor_union{
+    struct sensor_struct sensor;
+    uint16_t dara_raw[2];
+};
+
+union sensor_union data;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -88,7 +102,9 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-
+    data.sensor.temperature = 25;
+    data.sensor.humidity = 30;
+    data.sensor.illumination = 1000;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -96,9 +112,34 @@ int main(void)
   while (1)
   {
 
-    if (buttonPressedFlag){
+    if (buttonPressedFlag)
+    {
         buttonPressedFlag = 0;
-        led_blink(LED_GPIO_Port, LED_Pin, htim1);
+
+        HAL_StatusTypeDef result = 0;
+        FLASH_EraseInitTypeDef param_erase = {.NbPages = 1, .PageAddress = FLASH_ADDRESS, .TypeErase = TYPEERASE_PAGES};
+        uint32_t errors[1024];
+
+        HAL_FLASH_Unlock();
+        result += HAL_FLASHEx_Erase(&param_erase, errors);
+
+        for (int i = 0; i < sizeof(data)/2; ++i)
+        {
+            result += HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, FLASH_ADDRESS + i * 2,(uint64_t)data.dara_raw[i]);
+        }
+
+        HAL_FLASH_Lock();
+
+        if (result == HAL_OK)
+        {
+            led_blink(LED_GPIO_Port, LED_Pin, htim1);
+        }
+
+        __IO union sensor_union read_data;
+        for (int i = 0; i < sizeof(data)/2; ++i) {
+            read_data.dara_raw[i] = *(__IO uint16_t*)(FLASH_ADDRESS + i * 2);
+        }
+        __NOP(); //для отладки
 
     }
     /* USER CODE END WHILE */

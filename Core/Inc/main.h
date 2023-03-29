@@ -62,6 +62,7 @@ void Error_Handler(void);
 #define BUTTON_Pin GPIO_PIN_8
 #define BUTTON_GPIO_Port GPIOA
 #define BUTTON_EXTI_IRQn EXTI9_5_IRQn
+#define FLASH_ADDRESS 0x0801FC00
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
