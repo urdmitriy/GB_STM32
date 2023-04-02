@@ -325,11 +325,7 @@ void print_message(char * msg)
     strcpy(message, msg);
     strcat(message, "\n\r");
     size_t len = strlen(message);
-    uint8_t message_uint[len];
-    for (int i = 0; i < len; ++i) {
-        message_uint[i] = message[i];
-    }
-    HAL_UART_Transmit(&huart1,message_uint,(uint16_t)len,  100);
+    HAL_UART_Transmit(&huart1,(uint8_t *)message,(uint16_t)len,  100);
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
