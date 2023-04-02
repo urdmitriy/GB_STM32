@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "led_lib.h"
+#include "string.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,23 +40,16 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+IWDG_HandleTypeDef hiwdg;
+
 TIM_HandleTypeDef htim1;
+
+UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t buttonPressedFlag = 0;
 
-struct sensor_struct{
-    int8_t temperature;
-    int8_t humidity;
-    int16_t illumination;
-};
-
-union sensor_union{
-    struct sensor_struct sensor;
-    uint16_t dara_raw[2];
-};
-
-union sensor_union data;
+//union sensor_union data;
 
 /* USER CODE END PV */
 
@@ -63,8 +57,10 @@ union sensor_union data;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_IWDG_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+void print_message(char * msg);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -101,47 +97,33 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM1_Init();
+  MX_IWDG_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-    data.sensor.temperature = 25;
-    data.sensor.humidity = 30;
-    data.sensor.illumination = 1000;
-  /* USER CODE END 2 */
+
+    uint32_t status_reset = RCC->CSR;
+    print_message("Reboot\n\r");
+    if (status_reset & RCC_CSR_PINRSTF_Msk) print_message("PIN_reset_flag");
+    if (status_reset & RCC_CSR_PORRSTF_Msk) print_message("POR_PDR_reset_flag");
+    if (status_reset & RCC_CSR_SFTRSTF_Msk) print_message("Software_Reset_Flag");
+    if (status_reset & RCC_CSR_IWDGRSTF_Msk) print_message("Independent_Watchdog_Reset_Flag");
+    if (status_reset & RCC_CSR_LPWRRSTF_Msk) print_message("Low_Power_reset_flag");
+    print_message("==================================\n\r");
+    /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
     if (buttonPressedFlag)
     {
+        while (!HAL_GPIO_ReadPin(BUTTON_GPIO_Port, BUTTON_Pin)); //для проверки сторожевого таймера
         buttonPressedFlag = 0;
-
-        HAL_StatusTypeDef result = 0;
-        FLASH_EraseInitTypeDef param_erase = {.NbPages = 1, .PageAddress = FLASH_ADDRESS, .TypeErase = TYPEERASE_PAGES};
-        uint32_t errors[1024];
-
-        HAL_FLASH_Unlock();
-        result += HAL_FLASHEx_Erase(&param_erase, errors);
-
-        for (int i = 0; i < sizeof(data)/2; ++i)
-        {
-            result += HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, FLASH_ADDRESS + i * 2,(uint64_t)data.dara_raw[i]);
-        }
-
-        HAL_FLASH_Lock();
-
-        if (result == HAL_OK)
-        {
-            led_blink(LED_GPIO_Port, LED_Pin, htim1);
-        }
-
-        __IO union sensor_union read_data;
-        for (int i = 0; i < sizeof(data)/2; ++i) {
-            read_data.dara_raw[i] = *(__IO uint16_t*)(FLASH_ADDRESS + i * 2);
-        }
-        __NOP(); //для отладки
-
+        HAL_NVIC_SystemReset();
     }
+
+    HAL_IWDG_Refresh(&hiwdg);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -161,10 +143,11 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
@@ -186,6 +169,38 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
+  /** Enables the Clock Security System
+  */
+  HAL_RCC_EnableCSS();
+}
+
+/**
+  * @brief IWDG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_IWDG_Init(void)
+{
+
+  /* USER CODE BEGIN IWDG_Init 0 */
+
+  /* USER CODE END IWDG_Init 0 */
+
+  /* USER CODE BEGIN IWDG_Init 1 */
+
+  /* USER CODE END IWDG_Init 1 */
+  hiwdg.Instance = IWDG;
+  hiwdg.Init.Prescaler = IWDG_PRESCALER_64;
+  hiwdg.Init.Reload = 4095;
+  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN IWDG_Init 2 */
+
+  /* USER CODE END IWDG_Init 2 */
+
 }
 
 /**
@@ -235,6 +250,39 @@ static void MX_TIM1_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -271,7 +319,18 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void print_message(char * msg)
+{
+    char message[50];
+    strcpy(message, msg);
+    strcat(message, "\n\r");
+    size_t len = strlen(message);
+    uint8_t message_uint[len];
+    for (int i = 0; i < len; ++i) {
+        message_uint[i] = message[i];
+    }
+    HAL_UART_Transmit(&huart1,message_uint,(uint16_t)len,  100);
+}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
     if (GPIO_Pin == BUTTON_Pin){
