@@ -88,18 +88,19 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-
+    led_init(LED_GPIO_Port, LED_Pin, &htim1);
+    led_on();
+    HAL_Delay(3000);
+    led_off();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
     if (buttonPressedFlag){
         buttonPressedFlag = 0;
-        led_blink(LED_GPIO_Port, LED_Pin, htim1);
-
+        led_blink();
     }
     /* USER CODE END WHILE */
 
