@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "led_lib.h"
+//#include "led_lib.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,6 +43,7 @@ TIM_HandleTypeDef htim1;
 
 /* USER CODE BEGIN PV */
 volatile uint8_t buttonPressedFlag = 0;
+volatile uint8_t sleepFlag = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -88,20 +89,38 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-    led_init(LED_GPIO_Port, LED_Pin, &htim1);
-    led_on();
+    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
     HAL_Delay(3000);
-    led_off();
+    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if (buttonPressedFlag){
+
+    if (buttonPressedFlag)
+    {
+        HAL_ResumeTick();
+        HAL_Delay(200);
         buttonPressedFlag = 0;
-        led_blink();
+        if (!sleepFlag)
+        {
+            sleepFlag = 1;
+            HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 0);
+            HAL_Delay(500);
+            HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, 1);
+            HAL_SuspendTick();
+            HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON,PWR_SLEEPENTRY_WFI);
+        }
+        else
+        {
+            sleepFlag = 0;
+        }
+
     }
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
