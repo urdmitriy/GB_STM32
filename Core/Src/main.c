@@ -100,16 +100,16 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-    for (int i = 0; i < sizeof (data_led)/4; ++i) //Заполняем массив данными
+    for (int i = 0; i < sizeof (data_led)/4; ++i) //Заполняем массив данными от 0 - 6350 - 0
     {
         data_led[i] =
                 data_led[sizeof(data_led)/2 - 1 - i] =
                         i * 50;
     }
-    HAL_TIM_Base_Start(&htim3);
-    HAL_TIM_PWM_Start_DMA(&htim2,TIM_CHANNEL_2,(uint32_t *)data_led,sizeof (data_led)/2);
-//    HAL_ADCEx_Calibration_Start(&hadc1);
-    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)data_adc, sizeof (data_adc) / 2);
+    HAL_TIM_Base_Start(&htim3); //запускаем таймер, тактирующий АЦП
+    HAL_TIM_PWM_Start_DMA(&htim2,TIM_CHANNEL_2,(uint32_t *)data_led,sizeof (data_led)/2); //запускаем ШИМ
+    HAL_ADCEx_Calibration_Start(&hadc1); // калибруем АЦП
+    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)data_adc, sizeof (data_adc) / 2); //Запускаем преобразование АЦП (циклично)
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -238,7 +238,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 72-1;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 6000-1;
+  htim2.Init.Period = 6350-1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
