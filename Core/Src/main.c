@@ -100,16 +100,16 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-    for (int i = 0; i < sizeof (data_led)/4; ++i) //Ð—Ð°Ð¿Ð¾Ð»Ð½ÑÐµÐ¼ Ð¼Ð°ÑÑÐ¸Ð² Ð´Ð°Ð½Ð½Ñ‹Ð¼Ð¸ Ð¾Ñ‚ 0 - 6350 - 0
+    for (int i = 0; i < sizeof (data_led)/4; ++i) //çàïîëíÿåì ìàññèâ äàííûìè: 0 - 6350 - 0
     {
         data_led[i] =
                 data_led[sizeof(data_led)/2 - 1 - i] =
                         i * 50;
     }
-    HAL_TIM_Base_Start(&htim3); //Ð·Ð°Ð¿ÑƒÑÐºÐ°ÐµÐ¼ Ñ‚Ð°Ð¹Ð¼ÐµÑ€, Ñ‚Ð°ÐºÑ‚Ð¸Ñ€ÑƒÑŽÑ‰Ð¸Ð¹ ÐÐ¦ÐŸ
-    HAL_TIM_PWM_Start_DMA(&htim2,TIM_CHANNEL_2,(uint32_t *)data_led,sizeof (data_led)/2); //Ð·Ð°Ð¿ÑƒÑÐºÐ°ÐµÐ¼ Ð¨Ð?Ðœ
-    HAL_ADCEx_Calibration_Start(&hadc1); // ÐºÐ°Ð»Ð¸Ð±Ñ€ÑƒÐµÐ¼ ÐÐ¦ÐŸ
-    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)data_adc, sizeof (data_adc) / 2); //Ð—Ð°Ð¿ÑƒÑÐºÐ°ÐµÐ¼ Ð¿Ñ€ÐµÐ¾Ð±Ñ€Ð°Ð·Ð¾Ð²Ð°Ð½Ð¸Ðµ ÐÐ¦ÐŸ (Ñ†Ð¸ÐºÐ»Ð¸Ñ‡Ð½Ð¾)
+    HAL_TIM_Base_Start(&htim3); //çàïóñê òàéìåðà, çàïóñêàþùåãî ÀÖÏ
+    HAL_TIM_PWM_Start_DMA(&htim2,TIM_CHANNEL_2,(uint32_t *)data_led,sizeof (data_led)/2); //Çàïóñê ØÈÌ
+    HAL_ADCEx_Calibration_Start(&hadc1);
+    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)data_adc, sizeof (data_adc) / 2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
