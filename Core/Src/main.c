@@ -107,7 +107,7 @@ int main(void)
                         i * 50;
     }
     HAL_TIM_Base_Start(&htim3); //запускаем таймер, тактирующий АЦП
-    HAL_TIM_PWM_Start_DMA(&htim2,TIM_CHANNEL_2,(uint32_t *)data_led,sizeof (data_led)/2); //запускаем ШИМ
+    HAL_TIM_PWM_Start_DMA(&htim2,TIM_CHANNEL_2,(uint32_t *)data_led,sizeof (data_led)/2); //запускаем Ш�?М
     HAL_ADCEx_Calibration_Start(&hadc1); // калибруем АЦП
     HAL_ADC_Start_DMA(&hadc1, (uint32_t *)data_adc, sizeof (data_adc) / 2); //Запускаем преобразование АЦП (циклично)
   /* USER CODE END 2 */
@@ -251,7 +251,7 @@ static void MX_TIM2_Init(void)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.OCMode = TIM_OCMODE_PWM2;
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
