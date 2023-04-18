@@ -21,16 +21,19 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "crypto.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef enum {FAILED = 0, PASSED = !FAILED} TestStatus;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define TAG_LENGTH 4
+#define PLAINTEXT_LENGTH 4
+#define CIPHER_TEXT_LENGTH PLAINTEXT_LENGTH + TAG_LENGTH
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -39,26 +42,86 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
-DMA_HandleTypeDef hdma_adc1;
-
-TIM_HandleTypeDef htim2;
-TIM_HandleTypeDef htim3;
-DMA_HandleTypeDef hdma_tim2_ch2_ch4;
+CRC_HandleTypeDef hcrc;
 
 /* USER CODE BEGIN PV */
-uint16_t data_led[256] = {0,};
-uint16_t data_adc[256] = {0,};
+/* Header message, will be authenticated but not encrypted */
+const uint8_t HeaderMessage[] =
+        {
+                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07
+        };
+
+uint32_t HeaderLength = sizeof (HeaderMessage) ;
+
+/* string length only, without '\0' end of string marker */
+
+
+/* Payload message, will be authenticated and encrypted */
+const uint8_t Plaintext[] =
+        {
+                0x20, 0x21, 0x22, 0x23
+        };
+
+/* string length only, without '\0' end of string marker */
+uint32_t InputLength = sizeof (Plaintext) ;
+
+/* Key to be used for AES encryption/decryption */
+uint8_t Key[CRL_AES128_KEY] =
+        {
+                0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+                0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f
+        };
+
+/* Initialization Vector, used only in non-ECB modes */
+uint8_t IV[] =
+        {
+                0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16
+        };
+
+/* NIST example 1 ciphertext vector: in encryption we expect this vector as result */
+const uint8_t Expected_Ciphertext[CIPHER_TEXT_LENGTH] =
+        {
+                0x71, 0x62, 0x01, 0x5b, 0x4d, 0xac, 0x25, 0x5d
+        };
+
+/* Buffer to store the output data and the authentication TAG */
+uint8_t encrypt_OutputMessage[64];
+uint8_t decrypt_OutputMessage[64];
+int32_t encrypt_OutputMessageLength = 0;
+int32_t decrypt_OutputMessageLength = 0;
+int32_t AuthenticationTAGLength = 0;
+
+uint8_t tag[64];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
-static void MX_ADC1_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_TIM3_Init(void);
+static void MX_CRC_Init(void);
 /* USER CODE BEGIN PFP */
+int32_t STM32_AES_CCM_Encrypt(uint8_t*  HeaderMessage,
+                              uint32_t  HeaderMessageLength,
+                              uint8_t*  InputMessage,
+                              uint32_t  InputMessageLength,
+                              uint8_t  *AES128_Key,
+                              uint8_t  *InitializationVector,
+                              uint32_t  IvLength,
+                              uint8_t  *OutputMessage,
+                              int32_t *OutputMessageLength,
+                              int32_t *AuthenticationTAGLength
+);
+
+
+int32_t STM32_AES_CCM_Decrypt(uint8_t*  HeaderMessage,
+                              uint32_t  HeaderMessageLength,
+                              uint8_t*  InputMessage,
+                              uint32_t  InputMessageLength,
+                              uint8_t  *AES128_Key,
+                              uint8_t  *InitializationVector,
+                              uint32_t  IvLength,
+                              uint8_t  *OutputMessage,
+                              int32_t *OutputMessageLength,
+                              int32_t  AuthenticationTAGLength);
 
 /* USER CODE END PFP */
 
@@ -74,7 +137,7 @@ static void MX_TIM3_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+    volatile int32_t status = AES_SUCCESS;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -95,28 +158,27 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
-  MX_ADC1_Init();
-  MX_TIM2_Init();
-  MX_TIM3_Init();
+  MX_CRC_Init();
   /* USER CODE BEGIN 2 */
-    for (int i = 0; i < sizeof (data_led)/4; ++i) //заполняем массив данными: 0 - 6350 - 0
-    {
-        data_led[i] =
-                data_led[sizeof(data_led)/2 - 1 - i] =
-                        i * 50;
-    }
-    HAL_TIM_Base_Start(&htim3); //запуск таймера, запускающего АЦП
-    HAL_TIM_PWM_Start_DMA(&htim2,TIM_CHANNEL_2,(uint32_t *)data_led,sizeof (data_led)/2); //Запуск ШИМ
-    HAL_ADCEx_Calibration_Start(&hadc1);
-    HAL_ADC_Start_DMA(&hadc1, (uint32_t *)data_adc, sizeof (data_adc) / 2);
+
+
+    status = STM32_AES_CCM_Encrypt( (uint8_t *) HeaderMessage, HeaderLength , (uint8_t *) Plaintext,
+                                    InputLength, Key, IV, sizeof(IV), encrypt_OutputMessage,
+                                    &encrypt_OutputMessageLength, &AuthenticationTAGLength);
+
+    status = STM32_AES_CCM_Decrypt( (uint8_t *) HeaderMessage, sizeof(HeaderMessage), (uint8_t *) encrypt_OutputMessage,
+                                    encrypt_OutputMessageLength, Key, IV, sizeof(IV), decrypt_OutputMessage,
+                                    &decrypt_OutputMessageLength, AuthenticationTAGLength);
+
+    __IO uint32_t test = status;
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -132,7 +194,6 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -162,171 +223,31 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
-  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-  {
-    Error_Handler();
-  }
 }
 
 /**
-  * @brief ADC1 Initialization Function
+  * @brief CRC Initialization Function
   * @param None
   * @retval None
   */
-static void MX_ADC1_Init(void)
+static void MX_CRC_Init(void)
 {
 
-  /* USER CODE BEGIN ADC1_Init 0 */
+  /* USER CODE BEGIN CRC_Init 0 */
 
-  /* USER CODE END ADC1_Init 0 */
+  /* USER CODE END CRC_Init 0 */
 
-  ADC_ChannelConfTypeDef sConfig = {0};
+  /* USER CODE BEGIN CRC_Init 1 */
 
-  /* USER CODE BEGIN ADC1_Init 1 */
-
-  /* USER CODE END ADC1_Init 1 */
-
-  /** Common config
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
-  hadc1.Init.ContinuousConvMode = ENABLE;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T3_TRGO;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  /* USER CODE END CRC_Init 1 */
+  hcrc.Instance = CRC;
+  if (HAL_CRC_Init(&hcrc) != HAL_OK)
   {
     Error_Handler();
   }
+  /* USER CODE BEGIN CRC_Init 2 */
 
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_2;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_13CYCLES_5;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
-
-  /* USER CODE END ADC1_Init 2 */
-
-}
-
-/**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM2_Init(void)
-{
-
-  /* USER CODE BEGIN TIM2_Init 0 */
-
-  /* USER CODE END TIM2_Init 0 */
-
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
-
-  /* USER CODE BEGIN TIM2_Init 1 */
-
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 72-1;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 6350-1;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM2;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
-
-  /* USER CODE END TIM2_Init 2 */
-  HAL_TIM_MspPostInit(&htim2);
-
-}
-
-/**
-  * @brief TIM3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM3_Init(void)
-{
-
-  /* USER CODE BEGIN TIM3_Init 0 */
-
-  /* USER CODE END TIM3_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM3_Init 1 */
-
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 36000-1;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 200;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM3_Init 2 */
-
-  /* USER CODE END TIM3_Init 2 */
-
-}
-
-/**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Channel1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-  /* DMA1_Channel7_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
+  /* USER CODE END CRC_Init 2 */
 
 }
 
@@ -346,15 +267,21 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : LED_Pin */
+  GPIO_InitStruct.Pin = LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : BUTTON_Pin */
   GPIO_InitStruct.Pin = BUTTON_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(BUTTON_GPIO_Port, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -362,7 +289,173 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+/**
+  * @brief  AES CCM Authenticated Encryption example.
+  * @param  HeaderMessage: pointer to the header message. It will be authenticated but not encrypted.
+  * @param  HeaderMessageLength: header message length in byte.
+  * @param  Plaintext: pointer to input message to be encrypted.
+  * @param  PlaintextLength: input data message length in byte.
+  * @param  AES128_Key: pointer to the AES key to be used in the operation
+  * @param  InitializationVector: pointer to the Initialization Vector (IV)
+  * @param  IvLength: IV length in bytes.
+  * @param  OutputMessage: pointer to output parameter that will handle the encrypted message and TAG
+  * @param  OutputMessageLength: pointer to encrypted message length.
+  * @param  AuthenticationTAGLength: authentication TAG length.
+  * @retval error status: can be AES_SUCCESS if success or one of
+  *         AES_ERR_BAD_OPERATION, AES_ERR_BAD_CONTEXT
+  *         AES_ERR_BAD_PARAMETER if error occured.
+  */
+int32_t STM32_AES_CCM_Encrypt(uint8_t*  HeaderMessage,
+                              uint32_t  HeaderMessageLength,
+                              uint8_t*  Plaintext,
+                              uint32_t  PlaintextLength,
+                              uint8_t  *AES128_Key,
+                              uint8_t  *InitializationVector,
+                              uint32_t  IvLength,
+                              uint8_t  *OutputMessage,
+                              int32_t *OutputMessageLength,
+                              int32_t *AuthenticationTAGLength
+)
+{
+    AESCCMctx_stt AESctx;
 
+    uint32_t error_status = AES_SUCCESS;
+
+    /* Set flag field to default value */
+    AESctx.mFlags = E_SK_DEFAULT;
+
+    /* Set key size to 16 (corresponding to AES-128) */
+    AESctx.mKeySize = 16;
+
+    /* Set nonce size field to IvLength, note that valid values are 7,8,9,10,11,12,13*/
+    AESctx.mNonceSize = IvLength;
+
+    /* Size of returned authentication TAG */
+    AESctx.mTagSize = 4;
+
+    /* Set the size of the header */
+    AESctx.mAssDataSize = HeaderMessageLength;
+
+    /* Set the size of thepayload */
+    AESctx.mPayloadSize = PlaintextLength;
+
+    /* Initialize the operation, by passing the key and IV */
+    error_status = AES_CCM_Encrypt_Init(&AESctx, AES128_Key, InitializationVector );
+
+    /* check for initialization errors */
+    if (error_status == AES_SUCCESS)
+    {
+        /* Process Header */
+        error_status = AES_CCM_Header_Append(&AESctx,
+                                             HeaderMessage,
+                                             HeaderMessageLength);
+        if (error_status == AES_SUCCESS)
+        {
+            /* Encrypt Data */
+            error_status = AES_CCM_Encrypt_Append(&AESctx,
+                                                  Plaintext,
+                                                  PlaintextLength,
+                                                  OutputMessage,
+                                                  OutputMessageLength);
+
+            if (error_status == AES_SUCCESS)
+            {
+                /* Do the Finalization, write the TAG at the end of the encrypted message */
+                error_status = AES_CCM_Encrypt_Finish(&AESctx, OutputMessage + *OutputMessageLength, AuthenticationTAGLength);
+            }
+        }
+    }
+
+    return error_status;
+}
+
+
+/**
+  * @brief  AES CCM Authenticated Decryption example.
+  * @param  HeaderMessage: pointer to the header message. It will be authenticated but not Decrypted.
+  * @param  HeaderMessageLength: header message length in byte.
+  * @param  Plaintext: pointer to input message to be Decrypted.
+  * @param  PlaintextLength: input data message length in byte.
+  * @param  AES128_Key: pointer to the AES key to be used in the operation
+  * @param  InitializationVector: pointer to the Initialization Vector (IV)
+  * @param  IvLength: IV length in bytes.
+  * @param  OutputMessage: pointer to output parameter that will handle the Decrypted message and TAG
+  * @param  OutputMessageLength: pointer to Decrypted message length.
+  * @param  AuthenticationTAGLength: authentication TAG length.
+  * @retval error status: can be AUTHENTICATION_SUCCESSFUL if success or one of
+  *         AES_ERR_BAD_OPERATION, AES_ERR_BAD_CONTEXT
+  *         AES_ERR_BAD_PARAMETER, AUTHENTICATION_FAILED if error occured.
+  */
+int32_t STM32_AES_CCM_Decrypt(uint8_t*  HeaderMessage,
+                              uint32_t  HeaderMessageLength,
+                              uint8_t*  Plaintext,
+                              uint32_t  PlaintextLength,
+                              uint8_t  *AES128_Key,
+                              uint8_t  *InitializationVector,
+                              uint32_t  IvLength,
+                              uint8_t  *OutputMessage,
+                              int32_t *OutputMessageLength,
+                              int32_t  AuthenticationTAGLength
+)
+{
+    AESCCMctx_stt AESctx;
+
+    uint32_t error_status = AES_SUCCESS;
+
+    /* Set flag field to default value */
+    AESctx.mFlags = E_SK_DEFAULT;
+
+    /* Set key size to 16 (corresponding to AES-128) */
+    AESctx.mKeySize = 16;
+
+    /* Set nonce size field to IvLength, note that valid values are 7,8,9,10,11,12,13*/
+    AESctx.mNonceSize = IvLength;
+
+    /* Size of returned authentication TAG */
+    AESctx.mTagSize = 4;
+
+    /* Set the size of the header */
+    AESctx.mAssDataSize = HeaderMessageLength;
+
+    /* Set the size of thepayload */
+    AESctx.mPayloadSize = PlaintextLength;
+
+    /* Set the pointer to the TAG to be checked */
+    AESctx.pmTag = Plaintext + PlaintextLength;
+
+    /* Size of returned authentication TAG */
+    AESctx.mTagSize = AuthenticationTAGLength;
+
+
+    /* Initialize the operation, by passing the key and IV */
+    error_status = AES_CCM_Decrypt_Init(&AESctx, AES128_Key, InitializationVector );
+
+    /* check for initialization errors */
+    if (error_status == AES_SUCCESS)
+    {
+        /* Process Header */
+        error_status = AES_CCM_Header_Append(&AESctx,
+                                             HeaderMessage,
+                                             HeaderMessageLength);
+        if (error_status == AES_SUCCESS)
+        {
+            /* Decrypt Data */
+            error_status = AES_CCM_Decrypt_Append(&AESctx,
+                                                  Plaintext,
+                                                  PlaintextLength,
+                                                  OutputMessage,
+                                                  OutputMessageLength);
+
+            if (error_status == AES_SUCCESS)
+            {
+                /* Do the Finalization, check the authentication TAG*/
+                error_status = AES_CCM_Decrypt_Finish(&AESctx, NULL, &AuthenticationTAGLength);
+            }
+        }
+    }
+
+    return error_status;
+}
 /* USER CODE END 4 */
 
 /**

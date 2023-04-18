@@ -49,11 +49,11 @@ else ()
     add_compile_options(-Og -g)
 endif ()
 
-include_directories(Core/Inc Drivers/STM32F1xx_HAL_Driver/Inc Drivers/STM32F1xx_HAL_Driver/Inc/Legacy Drivers/CMSIS/Device/ST/STM32F1xx/Include Drivers/CMSIS/Include Lib)
-
+include_directories(Core/Inc Drivers/STM32F1xx_HAL_Driver/Inc Drivers/STM32F1xx_HAL_Driver/Inc/Legacy Drivers/CMSIS/Device/ST/STM32F1xx/Include Drivers/CMSIS/Include Lib STM32_Cryptographic/Inc STM32_Cryptographic/Lib)
+link_libraries(${CMAKE_SOURCE_DIR}/STM32_Cryptographic/Lib/libSTM32CryptographicV3.0.0_CM3_GCC.a)
 add_definitions(-DDEBUG -DUSE_HAL_DRIVER -DSTM32F103xB)
 
-file(GLOB_RECURSE SOURCES "Core/*.*" "Drivers/*.*" "Lib/*.*")
+file(GLOB_RECURSE SOURCES "Core/*.*" "Drivers/*.*" "Lib/*.*" "STM32_Cryptographic/Inc/*.*" "STM32_Cryptographic/Lib/*.*")
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32F103C8TX_FLASH.ld)
 
