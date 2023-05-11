@@ -48,13 +48,11 @@ else ()
     add_compile_options(-Og -g)
 endif ()
 
-include_directories(${includes} Lib STM32_Cryptographic/Inc STM32_Cryptographic/Lib)
+include_directories(${includes} Lib)
 
 add_definitions(${defines})
 
-file(GLOB_RECURSE SOURCES ${sources} "Lib/*.*" "STM32_Cryptographic/Inc/*.*" "STM32_Cryptographic/Lib/*.*")
-
-link_libraries(${CMAKE_SOURCE_DIR}/STM32_Cryptographic/Lib/libSTM32CryptographicV3.0.0_CM3_GCC.a)
+file(GLOB_RECURSE SOURCES ${sources} "Lib/*.*")
 
 set(LINKER_SCRIPT $${CMAKE_SOURCE_DIR}/${linkerScript})
 

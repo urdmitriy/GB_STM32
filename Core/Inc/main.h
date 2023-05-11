@@ -46,7 +46,8 @@ extern "C" {
 
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
-
+#define RX_BUFFER_SIZE 8192
+#define FIRMWARE_START_ADDRESS 0x08004000
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
